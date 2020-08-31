@@ -14,17 +14,13 @@ namespace testAssignment.Controllers
     [Route("api/[controller]")]
     public class TestController : ControllerBase
     {
-        private static readonly string[] Summaries = new[]
-        {
-            "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-        };
-
         private ApplicationContext db;
 
         public TestController(ApplicationContext context)
         {
             db = context;
 
+            //db first initialization
             if (!db.Owners.Any())
             {
                 List<Owner> owners = new List<Owner>();
@@ -59,11 +55,10 @@ namespace testAssignment.Controllers
 
                 db.Cars.AddRange(cars);
                 db.SaveChanges();
-                int f = owners[1].Id;
 
                 owners[0].OwnerCars.Add(new OwnerCar { CarId = cars[1].Id, OwnerId = owners[0].Id });
-                owners[1].OwnerCars.Add(new OwnerCar { CarId = cars[4].Id, OwnerId = f });
-                owners[1].OwnerCars.Add(new OwnerCar { CarId = cars[2].Id, OwnerId = f });
+                owners[1].OwnerCars.Add(new OwnerCar { CarId = cars[4].Id, OwnerId = owners[1].Id });
+                owners[1].OwnerCars.Add(new OwnerCar { CarId = cars[2].Id, OwnerId = owners[1].Id });
                 owners[2].OwnerCars.Add(new OwnerCar { CarId = cars[0].Id, OwnerId = owners[2].Id });
                 owners[3].OwnerCars.Add(new OwnerCar { CarId = cars[4].Id, OwnerId = owners[3].Id });
                 owners[4].OwnerCars.Add(new OwnerCar { CarId = cars[5].Id, OwnerId = owners[4].Id });
@@ -89,10 +84,19 @@ namespace testAssignment.Controllers
         }
 
         [HttpGet("{id}")]
-        public IEnumerable<Owner> Get(int id)
+        public IActionResult Get(int? id)
         {
+            if (id == null)
+            {
+                return BadRequest();
+            }
 
             Car car = db.Cars.Include(x => x.OwnerCars).ThenInclude(x => x.Owner).FirstOrDefault(x => x.Id == id);
+
+            if (car == null)
+            {
+                return NotFound();
+            }
 
             List<Owner> owners = new List<Owner>();
             car.OwnerCars.ForEach(x => owners.Add(
@@ -103,14 +107,28 @@ namespace testAssignment.Controllers
                     BirthYear = x.Owner.BirthYear
                 }));
 
-            return owners;
+            return Ok(owners);
         }
 
         [HttpPost]
-        public IEnumerable<Car> Post(Owner owner)
+        public IActionResult Post(Owner owner)
         {
-            Owner foundOwner = db.Owners.Include(x => x.OwnerCars).ThenInclude(x => x.Car).FirstOrDefault(x => x.Id == owner.Id);
 
+            if (owner.FirstName == null || owner.LastName == null)
+            {
+                BadRequest();
+            }
+
+            Owner foundOwner = 
+                db.Owners
+                .Include(x => x.OwnerCars)
+                .ThenInclude(x => x.Car)
+                .FirstOrDefault(x => x.FirstName == owner.FirstName && x.LastName == owner.LastName);
+
+            if (foundOwner == null)
+            {
+                return NotFound();
+            }
 
             List<Car> cars = new List<Car>();
             foundOwner.OwnerCars.ForEach(x => cars.Add(
@@ -123,7 +141,7 @@ namespace testAssignment.Controllers
                     YearOfProduction = x.Car.YearOfProduction
                 }));
 
-            return cars;
+            return Ok(cars);
         }
     }
 }
